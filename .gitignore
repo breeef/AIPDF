@@ -1,0 +1,46 @@
+# === Environment & Secrets ===
+.env
+.env.local
+.env*.local
+
+# === Database & Storage ===
+backend/storage/aipdf.db
+backend/storage/pdfs/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+dist/
+build/
+
+# === Node / Next.js ===
+node_modules/
+.next/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Misc ===
+*.pem
+*.log
+npm-debug.log*
+.claude/
+CLAUDE.md
+AGENTS.md
+tsconfig.tsbuildinfo
+frontend/next-env.d.ts

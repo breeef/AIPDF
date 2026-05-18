@@ -65,6 +65,7 @@ class ChatMessageRequest(BaseModel):
 
 
 class ChatMessageResponse(BaseModel):
+    id: str | None = None
     role: str
     content: str
     diff: GraphDiff | None = None

@@ -77,8 +77,20 @@ export function useGraph() {
     setLoading(true);
     try {
       const data = await api.getGraph(paperId);
-      setNodes(data.nodes.map(toFlowNode));
-      setEdges(data.edges.map(toFlowEdge));
+      const seenNodeIds = new Set<string>();
+      const dedupedNodes = data.nodes.filter((n) => {
+        if (seenNodeIds.has(n.id)) return false;
+        seenNodeIds.add(n.id);
+        return true;
+      });
+      const seenEdgeIds = new Set<string>();
+      const dedupedEdges = data.edges.filter((e) => {
+        if (seenEdgeIds.has(e.id)) return false;
+        seenEdgeIds.add(e.id);
+        return true;
+      });
+      setNodes(dedupedNodes.map(toFlowNode));
+      setEdges(dedupedEdges.map(toFlowEdge));
       setVersion(data.version);
     } catch {
       setNodes([]);
@@ -144,8 +156,27 @@ export function useGraph() {
         });
       }
 
-      const newFlowNodes = diff.add_nodes.map(toFlowNode);
-      const newFlowEdges = diff.add_edges.map(toFlowEdge);
+      const existingNodeIds = new Set(updatedNodes.map((n) => n.id));
+      const existingEdgeIds = new Set(updatedEdges.map((e) => e.id));
+      const ts = Date.now();
+
+      const newFlowNodes = diff.add_nodes.map((n, i) => {
+        const node = { ...n };
+        if (existingNodeIds.has(node.id)) {
+          node.id = `${node.id}_${ts}_${i}`;
+        }
+        existingNodeIds.add(node.id);
+        return toFlowNode(node);
+      });
+
+      const newFlowEdges = diff.add_edges.map((e, i) => {
+        const edge = { ...e };
+        if (existingEdgeIds.has(edge.id)) {
+          edge.id = `${edge.id}_${ts}_${i}`;
+        }
+        existingEdgeIds.add(edge.id);
+        return toFlowEdge(edge);
+      });
 
       updatedNodes = [...updatedNodes, ...newFlowNodes];
       updatedEdges = [...updatedEdges, ...newFlowEdges];

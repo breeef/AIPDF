@@ -14,7 +14,7 @@ from services.chat_service import process_chat
 router = APIRouter()
 
 
-@router.post("/papers/{paper_id}/chat", response_model=ChatMessageResponse)
+@router.post("/papers/{paper_id}/chat")
 async def chat(
     paper_id: str,
     req: ChatMessageRequest,
@@ -28,7 +28,8 @@ async def chat(
         thinking=settings.get_thinking("chat"),
     )
     try:
-        return await process_chat(paper_id, req.message, req.selected_node_ids, db, llm)
+        result = await process_chat(paper_id, req.message, req.selected_node_ids, db, llm)
+        return result
     except ValueError as e:
         raise HTTPException(404, str(e)) from e
     except LLMError as e:
@@ -67,7 +68,25 @@ async def get_chat_history(paper_id: str, db: AsyncSession = Depends(get_db)):
     messages = result.scalars().all()
     return ChatHistoryResponse(
         messages=[
-            ChatMessageResponse(role=m.role, content=m.content)
+            ChatMessageResponse(id=m.id, role=m.role, content=m.content)
             for m in messages
         ]
     )
+
+
+@router.delete("/papers/{paper_id}/chat")
+async def delete_chat_history(paper_id: str, db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import delete
+    await db.execute(delete(ChatMessage).where(ChatMessage.paper_id == paper_id))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/papers/{paper_id}/chat/{message_id}")
+async def delete_chat_message(paper_id: str, message_id: str, db: AsyncSession = Depends(get_db)):
+    msg = await db.get(ChatMessage, message_id)
+    if not msg or msg.paper_id != paper_id:
+        raise HTTPException(404, "Message not found")
+    await db.delete(msg)
+    await db.commit()
+    return {"ok": True}

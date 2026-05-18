@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import * as api from "@/lib/api";
 import type { ChatMessage, GraphDiff } from "@/lib/types";
 
@@ -9,6 +9,7 @@ export function useChat() {
   const [sending, setSending] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const loadHistory = useCallback(async (paperId: string) => {
     try {
@@ -36,28 +37,64 @@ export function useChat() {
     setSuggestions([]);
   }, []);
 
+  const deleteHistory = useCallback(async (paperId: string) => {
+    await api.deleteChatHistory(paperId);
+    setMessages([]);
+    setSuggestions([]);
+  }, []);
+
+  const deleteMessage = useCallback(
+    async (paperId: string, messageId: string) => {
+      await api.deleteChatMessage(paperId, messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    },
+    []
+  );
+
+  const stopSending = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
   const sendMessage = useCallback(
     async (
       paperId: string,
       message: string,
       selectedNodeIds: string[]
     ): Promise<GraphDiff | null> => {
+      const ac = new AbortController();
+      abortRef.current = ac;
       setSending(true);
-      setMessages((prev) => [...prev, { role: "user", content: message }]);
+      const tempUserId = `temp_${Date.now()}`;
+      setMessages((prev) => [...prev, { id: tempUserId, role: "user", content: message }]);
 
       try {
-        const res = await api.sendChatMessage(paperId, message, selectedNodeIds);
+        const res = await api.sendChatMessage(paperId, message, selectedNodeIds, ac.signal) as Record<string, unknown>;
+        const userMsgId = (res.user_msg_id as string) || tempUserId;
+        const assistantMsgId = res.assistant_msg_id as string | undefined;
+        const diff = res.diff as GraphDiff | null;
+
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempUserId ? { ...m, id: userMsgId } : m))
+        );
+
         const assistantMsg: ChatMessage = {
+          id: assistantMsgId,
           role: "assistant",
-          content: res.content,
-          diff: res.diff,
+          content: res.content as string,
+          diff,
         };
         setMessages((prev) => [...prev, assistantMsg]);
-        if (res.suggestions && res.suggestions.length > 0) {
-          setSuggestions(res.suggestions);
+        const sug = res.suggestions as string[] | undefined;
+        if (sug && sug.length > 0) {
+          setSuggestions(sug);
         }
-        return res.diff;
+        return diff;
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+          return null;
+        }
         const errorMsg: ChatMessage = {
           role: "assistant",
           content: `Error: ${err instanceof Error ? err.message : "Request failed"}`,
@@ -65,11 +102,12 @@ export function useChat() {
         setMessages((prev) => [...prev, errorMsg]);
         return null;
       } finally {
+        abortRef.current = null;
         setSending(false);
       }
     },
     []
   );
 
-  return { messages, sending, sendMessage, loadHistory, clearMessages, suggestions, suggestionsLoading, loadSuggestions };
+  return { messages, sending, sendMessage, stopSending, loadHistory, clearMessages, deleteHistory, deleteMessage, suggestions, suggestionsLoading, loadSuggestions };
 }

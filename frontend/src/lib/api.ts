@@ -44,12 +44,14 @@ export async function saveGraph(
 export async function sendChatMessage(
   paperId: string,
   message: string,
-  selectedNodeIds: string[]
+  selectedNodeIds: string[],
+  signal?: AbortSignal
 ): Promise<{ role: string; content: string; diff: GraphDiff | null; suggestions?: string[] }> {
   return request(`/api/papers/${paperId}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, selected_node_ids: selectedNodeIds }),
+    signal,
   });
 }
 
@@ -63,6 +65,14 @@ export async function getChatHistory(
   paperId: string
 ): Promise<{ messages: ChatMessage[] }> {
   return request(`/api/papers/${paperId}/chat`);
+}
+
+export async function deleteChatHistory(paperId: string): Promise<void> {
+  await request(`/api/papers/${paperId}/chat`, { method: "DELETE" });
+}
+
+export async function deleteChatMessage(paperId: string, messageId: string): Promise<void> {
+  await request(`/api/papers/${paperId}/chat/${messageId}`, { method: "DELETE" });
 }
 
 export function getPdfUrl(paperId: string): string {

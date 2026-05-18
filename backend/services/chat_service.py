@@ -86,7 +86,16 @@ async def process_chat(
     db.add(user_msg)
     db.add(assistant_msg)
     await db.commit()
+    await db.refresh(user_msg)
+    await db.refresh(assistant_msg)
 
     follow_ups = response_data.get("follow_ups", [])
 
-    return ChatMessageResponse(role="assistant", content=content, diff=diff, suggestions=follow_ups)
+    return {
+        "user_msg_id": user_msg.id,
+        "assistant_msg_id": assistant_msg.id,
+        "role": "assistant",
+        "content": content,
+        "diff": diff,
+        "suggestions": follow_ups,
+    }

@@ -69,6 +69,7 @@ export interface GraphDiff {
 }
 
 export interface ChatMessage {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   diff?: GraphDiff | null;
